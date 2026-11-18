@@ -88,6 +88,23 @@ class MainActivity : Activity() {
         }
         card.addView(scheduleButton, fieldParams())
 
+        card.addView(label("مواعيد مقترحة لـ 6 منشورات يوميًا", true), fieldParams())
+        val slots = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        listOf(10, 12, 14, 16, 18, 20).forEach { hour ->
+            val slot = Button(this).apply {
+                text = String.format(Locale.US, "%02d:00", hour)
+                textSize = 11f
+                setOnClickListener { setSuggestedTime(hour) }
+            }
+            slots.addView(slot, LinearLayout.LayoutParams(0, -2, 1f).apply {
+                marginEnd = dp(2)
+            })
+        }
+        card.addView(slots, fieldParams())
+
         val add = Button(this).apply {
             text = "حفظ وجدولة التذكير"
             setOnClickListener { addPost() }
@@ -107,6 +124,18 @@ class MainActivity : Activity() {
             setTextColor(0xFF7A4B00.toInt())
             setPadding(dp(4), dp(18), dp(4), 0)
         }, wrap())
+    }
+
+    private fun setSuggestedTime(hour: Int) {
+        selectedTime = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            if (timeInMillis <= System.currentTimeMillis()) add(Calendar.DAY_OF_YEAR, 1)
+        }
+        selectedMillis = selectedTime.timeInMillis
+        scheduleButton.text = "موعد النشر: ${dateFormat.format(Date(selectedMillis))}"
     }
 
     private fun chooseDateTime() {
