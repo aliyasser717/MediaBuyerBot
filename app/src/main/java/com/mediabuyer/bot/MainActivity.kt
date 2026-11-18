@@ -179,20 +179,44 @@ aliyasser42939@gmail.com 📩
                         org.json.JSONArray().put(JSONObject().put("text", prompt)))))
                     put("generationConfig", JSONObject().put("responseMimeType", "application/json"))
                 }
-                val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$apiKey")
-                val connection = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"; connectTimeout = 20000; readTimeout = 90000; doOutput = true
-                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                var successfulBody: String? = null
+                var lastError = "تعذر الاتصال بـ Gemini"
+                // Try the primary model twice for temporary overload, then automatically fall back.
+                val models = listOf("gemini-3.8-flash", "gemini-3.5-flash-lite")
+                for (model in models) {
+                    var modelSucceeded = false
+                    val attempts = if (model == models.first()) 2 else 1
+                    for (attempt in 0 until attempts) {
+                        var connection: HttpURLConnection? = null
+                        try {
+                            val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey")
+                            connection = (url.openConnection() as HttpURLConnection).apply {
+                                requestMethod = "POST"; connectTimeout = 20000; readTimeout = 90000; doOutput = true
+                                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                            }
+                            connection.outputStream.use { it.write(request.toString().toByteArray(Charsets.UTF_8)) }
+                            val status = connection.responseCode
+                            val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
+                                ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: "{}"
+                            if (status in 200..299) {
+                                successfulBody = body
+                                modelSucceeded = true
+                                break
+                            }
+                            val errorObject = JSONObject(body).optJSONObject("error")
+                            lastError = errorObject?.optString("message") ?: "تعذر الاتصال بـ Gemini"
+                            // Only retry/fallback on server overload; report auth/quota/model errors directly.
+                            if (status != 503 && status != 500 && status != 502 && status != 504) {
+                                throw Exception(lastError)
+                            }
+                            if (attempt + 1 < attempts) Thread.sleep(1800L)
+                        } finally {
+                            connection?.disconnect()
+                        }
+                    }
+                    if (modelSucceeded) break
                 }
-                connection.outputStream.use { it.write(request.toString().toByteArray(Charsets.UTF_8)) }
-                val status = connection.responseCode
-                val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                    ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: "{}"
-                connection.disconnect()
-                if (status !in 200..299) {
-                    val message = JSONObject(body).optJSONObject("error")?.optString("message")
-                    throw Exception(message ?: "تعذر الاتصال بـ Gemini")
-                }
+                val body = successfulBody ?: throw Exception("الموديل الأساسي والبديل مش متاحين حاليًا. جرّب بعد شوية. التفاصيل: $lastError")
                 val responseText = JSONObject(body).getJSONArray("candidates").getJSONObject(0)
                     .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
                 val postsArray = JSONObject(responseText).getJSONArray("posts")
