@@ -5,15 +5,20 @@ const app = express();
 app.use(express.json({ limit: "32kb" }));
 
 const port = Number(process.env.PORT || 3000);
-const model = process.env.OPENAI_MODEL || "gpt-5.5";
+const model = process.env.OPENAI_MODEL || "gpt-5-mini";
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "media-buyer-bot-api" });
 });
 
 app.post("/api/generate-six", async (req, res) => {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.OPENAI_API_KEY || !process.env.APP_API_TOKEN) {
     return res.status(503).json({ error: "AI service is not configured yet." });
+  }
+
+  const suppliedToken = req.get("authorization")?.replace(/^Bearer\\s+/i, "");
+  if (!suppliedToken || suppliedToken !== process.env.APP_API_TOKEN) {
+    return res.status(401).json({ error: "Unauthorized. Check the app access token." });
   }
 
   const audience = typeof req.body?.audience === "string"
