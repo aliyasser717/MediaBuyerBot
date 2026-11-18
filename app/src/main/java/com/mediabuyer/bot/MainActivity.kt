@@ -185,11 +185,16 @@ class MainActivity : Activity() {
                 gravity = Gravity.CENTER
             }
             val copy = Button(this).apply {
-                text = "نسخ البوست"
+                text = "نسخ وفتح الجروب"
                 setOnClickListener {
                     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("Facebook post", post.content))
-                    toast("تم نسخ نص البوست")
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(post.groupUrl)))
+                        toast("اتنسخ البوست واتفتح الجروب — راجع المنشور واضغط نشر بنفسك")
+                    } catch (_: Exception) {
+                        toast("اتنسخ البوست، لكن مش قادر أفتح الرابط")
+                    }
                 }
             }
             val open = Button(this).apply {
