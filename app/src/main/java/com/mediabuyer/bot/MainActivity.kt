@@ -179,7 +179,7 @@ aliyasser42939@gmail.com 📩
                         org.json.JSONArray().put(JSONObject().put("text", prompt)))))
                     put("generationConfig", JSONObject().put("responseMimeType", "application/json"))
                 }
-                val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
+                val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$apiKey")
                 val connection = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"; connectTimeout = 20000; readTimeout = 90000; doOutput = true
                     setRequestProperty("Content-Type", "application/json; charset=utf-8")
