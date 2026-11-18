@@ -20,7 +20,7 @@ class ReminderReceiver : BroadcastReceiver() {
         }
 
         val title = intent.getStringExtra("title") ?: "موعد نشر بوست"
-        val content = intent.getStringExtra("content") ?: "افتح التطبيق لمراجعة المنشور."
+        val content = intent.getStringExtra("content") ?: "اضغط لمشاركة المنشور والنص جاهز."
         val groupUrl = intent.getStringExtra("groupUrl") ?: ""
 
         val openApp = PendingIntent.getActivity(
@@ -28,6 +28,7 @@ class ReminderReceiver : BroadcastReceiver() {
             Intent(context, MainActivity::class.java).apply {
                 putExtra("reminderContent", content)
                 putExtra("reminderGroupUrl", groupUrl)
+                putExtra("shareOnOpen", true)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -36,7 +37,7 @@ class ReminderReceiver : BroadcastReceiver() {
             Notification.Builder(context, channelId)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle("حان موعد النشر: $title")
-                .setContentText("افتح التطبيق لنسخ البوست وفتح الجروب.")
+                .setContentText("اضغط لفتح مشاركة البوست والنص جاهز.")
                 .setStyle(Notification.BigTextStyle().bigText(content.take(180)))
                 .setAutoCancel(true)
                 .setContentIntent(openApp)
