@@ -16,7 +16,7 @@ app.post("/api/generate-six", async (req, res) => {
     return res.status(503).json({ error: "AI service is not configured yet." });
   }
 
-  const suppliedToken = req.get("authorization")?.replace(/^Bearer\\s+/i, "");
+  const suppliedToken = req.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!suppliedToken || suppliedToken !== process.env.APP_API_TOKEN) {
     return res.status(401).json({ error: "Unauthorized. Check the app access token." });
   }
