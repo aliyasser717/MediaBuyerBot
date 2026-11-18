@@ -29,8 +29,7 @@ class MainActivity : Activity() {
     private lateinit var titleInput: EditText
     private lateinit var contentInput: EditText
     private lateinit var groupInput: EditText
-    private lateinit var backendUrlInput: EditText
-    private lateinit var backendTokenInput: EditText
+    private lateinit var geminiKeyInput: EditText
     private lateinit var scheduleButton: Button
     private var selectedTime = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, 1) }
     private var selectedMillis: Long = selectedTime.timeInMillis
@@ -87,13 +86,12 @@ class MainActivity : Activity() {
         contentInput.minLines = 5
         contentInput.gravity = Gravity.TOP or Gravity.RIGHT
         groupInput = edit("رابط جروب فيسبوك")
-        backendUrlInput = edit("رابط خادم الذكاء الاصطناعي HTTPS")
-        backendTokenInput = edit("رمز ربط التطبيق بالخادم")
+        geminiKeyInput = edit("مفتاح Gemini المجاني")
+        geminiKeyInput.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
         card.addView(titleInput, fieldParams())
         card.addView(contentInput, fieldParams())
         card.addView(groupInput, fieldParams())
-        card.addView(backendUrlInput, fieldParams())
-        card.addView(backendTokenInput, fieldParams())
+        card.addView(geminiKeyInput, fieldParams())
 
         val generate = Button(this).apply {
             text = "توليد 6 بوستات بالذكاء الاصطناعي وجدولتها"
@@ -146,68 +144,66 @@ class MainActivity : Activity() {
     }
 
     private fun generateAndSchedulePosts() {
-        val endpoint = backendUrlInput.text.toString().trim().trimEnd('/')
+        val apiKey = geminiKeyInput.text.toString().trim()
         val groupUrl = groupInput.text.toString().trim()
-        if (!endpoint.startsWith("https://")) {
-            toast("أدخل رابط الخادم المنشور ويبدأ بـ https://")
-            return
-        }
-        val apiToken = backendTokenInput.text.toString().trim()
-        if (apiToken.isBlank()) {
-            toast("أدخل رمز ربط التطبيق بالخادم")
-            return
-        }
+        if (apiKey.isBlank()) { toast("أدخل مفتاح Gemini المجاني"); return }
         if (!groupUrl.startsWith("https://") && !groupUrl.startsWith("http://")) {
-            toast("أدخل رابط جروب فيسبوك أولًا")
-            return
+            toast("أدخل رابط جروب فيسبوك أولًا"); return
         }
-        toast("جاري توليد المنشورات الستة...")
+        toast("جاري توليد 6 منشورات...")
         Thread {
             try {
-                val connection = (URL("$endpoint/api/generate-six").openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 20000
-                    readTimeout = 90000
-                    doOutput = true
+                val prompt = """
+                    اكتب 6 منشورات تسويقية مختلفة باللهجة المصرية الطبيعية لمتخصص Media Buying.
+                    الجمهور: أصحاب البيزنس والمتاجر الإلكترونية والبراندات والشركات وصناع القرار، وليس المدرسين.
+                    الموضوعات: إعلانات Meta، تحسين الحملات، جذب العملاء المحتملين، أخطاء الإعلانات، قياس النتائج، ونصائح عملية.
+                    كل منشور مفيد وجذاب وغير مكرر، مع Hook قوي ودعوة تواصل مناسبة، بدون أرقام أو ادعاءات مختلقة.
+                    أرجع JSON فقط بالشكل: {"posts":[{"title":"عنوان قصير","content":"نص المنشور"}]}
+                """.trimIndent()
+                val request = JSONObject().apply {
+                    put("contents", org.json.JSONArray().put(JSONObject().put("parts",
+                        org.json.JSONArray().put(JSONObject().put("text", prompt)))))
+                    put("generationConfig", JSONObject().put("responseMimeType", "application/json"))
+                }
+                val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
+                val connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"; connectTimeout = 20000; readTimeout = 90000; doOutput = true
                     setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                    setRequestProperty("Authorization", "Bearer $apiToken")
                 }
-                val payload = JSONObject().apply {
-                    put("audience", "أصحاب البيزنس والمتاجر الإلكترونية والبراندات والشركات وصناع القرار")
-                    put("context", "خدمات Media Buying وإعلانات Meta وتحسين الحملات وجلب العملاء المحتملين")
-                }
-                connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+                connection.outputStream.use { it.write(request.toString().toByteArray(Charsets.UTF_8)) }
                 val status = connection.responseCode
                 val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
                     ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: "{}"
                 connection.disconnect()
-                if (status !in 200..299) throw Exception(JSONObject(body).optString("error", "تعذر الاتصال بالخادم"))
-                val postsArray = JSONObject(body).getJSONArray("posts")
-                if (postsArray.length() != 6) throw Exception("الخادم لم يُرجع 6 منشورات")
+                if (status !in 200..299) {
+                    val message = JSONObject(body).optJSONObject("error")?.optString("message")
+                    throw Exception(message ?: "تعذر الاتصال بـ Gemini")
+                }
+                val responseText = JSONObject(body).getJSONArray("candidates").getJSONObject(0)
+                    .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+                val postsArray = JSONObject(responseText).getJSONArray("posts")
+                if (postsArray.length() != 6) throw Exception("Gemini لم يُرجع 6 منشورات")
                 val now = Calendar.getInstance()
                 val hours = listOf(10, 12, 14, 16, 18, 20)
                 val generated = mutableListOf<PostItem>()
                 for (i in 0 until 6) {
                     val item = postsArray.getJSONObject(i)
                     val slot = Calendar.getInstance().apply {
-                        set(Calendar.HOUR_OF_DAY, hours[i])
-                        set(Calendar.MINUTE, 0)
-                        set(Calendar.SECOND, 0)
-                        set(Calendar.MILLISECOND, 0)
+                        set(Calendar.HOUR_OF_DAY, hours[i]); set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
                         while (timeInMillis <= now.timeInMillis) add(Calendar.DAY_OF_YEAR, 1)
                     }
                     val title = item.getString("title").trim()
                     val content = item.getString("content").trim()
                     if (title.isBlank() || content.isBlank()) throw Exception("فيه منشور فاضي، جرّب تاني")
-                    val id = ((System.currentTimeMillis() + i) % Int.MAX_VALUE).toInt()
-                    generated.add(PostItem(id, title, content, groupUrl, slot.timeInMillis))
+                    generated.add(PostItem(((System.currentTimeMillis() + i) % Int.MAX_VALUE).toInt(),
+                        title, content, groupUrl, slot.timeInMillis))
                 }
                 runOnUiThread {
                     val all = ScheduleStore.load(this).apply { addAll(generated) }
                     ScheduleStore.save(this, all)
                     generated.forEach { ScheduleStore.schedule(this, it) }
-                    renderPosts()
-                    toast("اتولدوا واتجدولوا 6 منشورات بنجاح")
+                    renderPosts(); toast("اتولدوا واتجدولوا 6 منشورات بنجاح")
                 }
             } catch (error: Exception) {
                 runOnUiThread { toast(error.message ?: "حصل خطأ أثناء التوليد") }
