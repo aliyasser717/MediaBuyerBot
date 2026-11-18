@@ -119,7 +119,7 @@ class MainActivity : Activity() {
         listBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.addView(listBox, wrap())
 
-        root.addView(label("مهم: التطبيق يذكّرك بالموعد ويفتح الجروب؛ لا ينشر داخل فيسبوك تلقائيًا.").apply {
+        root.addView(label("مشاركة البوست تفتح خيارات المشاركة المتاحة على جهازك؛ اختَر Facebook والجروب بنفسك وراجع المنشور قبل النشر.").apply {
             textSize = 12f
             setTextColor(0xFF7A4B00.toInt())
             setPadding(dp(4), dp(18), dp(4), 0)
@@ -218,23 +218,12 @@ class MainActivity : Activity() {
                 setOnClickListener {
                     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("Facebook post", post.content))
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(post.groupUrl)))
-                        toast("اتنسخ البوست واتفتح الجروب — راجع المنشور واضغط نشر بنفسك")
-                    } catch (_: Exception) {
-                        toast("اتنسخ البوست، لكن مش قادر أفتح الرابط")
-                    }
+                    openFacebookGroup(post.groupUrl)
                 }
             }
-            val open = Button(this).apply {
-                text = "فتح الجروب"
-                setOnClickListener {
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(post.groupUrl)))
-                    } catch (_: Exception) {
-                        toast("مش قادر أفتح الرابط")
-                    }
-                }
+            val share = Button(this).apply {
+                text = "مشاركة النص"
+                setOnClickListener { sharePost(post.content) }
             }
             val delete = Button(this).apply {
                 text = "حذف"
@@ -246,12 +235,42 @@ class MainActivity : Activity() {
                 }
             }
             buttons.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
-            buttons.addView(open, LinearLayout.LayoutParams(0, -2, 1f))
+            buttons.addView(share, LinearLayout.LayoutParams(0, -2, 1f))
             buttons.addView(delete, LinearLayout.LayoutParams(0, -2, 0.7f))
             card.addView(buttons, wrap())
             listBox.addView(card, LinearLayout.LayoutParams(-1, -2).apply {
                 topMargin = dp(8)
             })
+        }
+    }
+
+    private fun openFacebookGroup(groupUrl: String) {
+        val uri = Uri.parse(groupUrl)
+        try {
+            val facebookIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                setPackage("com.facebook.katana")
+            }
+            startActivity(facebookIntent)
+            toast("اتفتح الجروب في Facebook والنص اتنسخ — الصقه وراجعه قبل النشر")
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, uri))
+                toast("Facebook مش متاح لفتح الرابط؛ اتفتح في التطبيق المتاح والنص اتنسخ")
+            } catch (_: Exception) {
+                toast("اتنسخ النص، لكن تعذر فتح رابط الجروب")
+            }
+        }
+    }
+
+    private fun sharePost(postText: String) {
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, postText)
+        }
+        try {
+            startActivity(Intent.createChooser(sendIntent, "مشاركة البوست"))
+        } catch (_: Exception) {
+            toast("مفيش تطبيق متاح لمشاركة النص")
         }
     }
 
