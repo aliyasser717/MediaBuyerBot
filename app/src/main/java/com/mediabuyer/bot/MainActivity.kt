@@ -34,6 +34,17 @@ class MainActivity : Activity() {
     private var selectedTime = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, 1) }
     private var selectedMillis: Long = selectedTime.timeInMillis
     private val dateFormat = SimpleDateFormat("EEE، d MMM yyyy - hh:mm a", Locale("ar"))
+    private val fixedFooter = """---------------------------------
+للتواصل :
+01140526578📲
+aliyasser42939@gmail.com 📩
+---------------------------------
+#ميديا_باير_فاهم #تسويق_رقمي #اعلان_صح #ديجيتال_ماركتنج #خبير_اعلانات #Media_Buyer"""
+
+    private fun addFixedFooter(content: String): String {
+        val clean = content.trim()
+        return if (clean.endsWith(fixedFooter)) clean else "$clean\n\n$fixedFooter"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -158,6 +169,8 @@ class MainActivity : Activity() {
                     الجمهور: أصحاب البيزنس والمتاجر الإلكترونية والبراندات والشركات وصناع القرار، وليس المدرسين.
                     الموضوعات: إعلانات Meta، تحسين الحملات، جذب العملاء المحتملين، أخطاء الإعلانات، قياس النتائج، ونصائح عملية.
                     كل منشور مفيد وجذاب وغير مكرر، مع Hook قوي ودعوة تواصل مناسبة، بدون أرقام أو ادعاءات مختلقة.
+                    اكتب متن المنشور فقط ولا تضف بيانات التواصل أو الهاشتاجات؛ التطبيق سيضيف توقيع التواصل الثابت حرفيًا في نهاية كل منشور.
+                    أسلوب الكتابة المطلوب: مصري طبيعي ومهني، يبدأ بهوك قوي أو مشكلة واقعية، يقدم نقطة عملية واضحة، وينتهي بدعوة تفاعل/تواصل غير مبالغ فيها. نوّع الزوايا ولا تكرر نفس المقدمة أو الفكرة.
                     أرجع JSON فقط بالشكل: {"posts":[{"title":"عنوان قصير","content":"نص المنشور"}]}
                 """.trimIndent()
                 val request = JSONObject().apply {
@@ -194,7 +207,7 @@ class MainActivity : Activity() {
                         while (timeInMillis <= now.timeInMillis) add(Calendar.DAY_OF_YEAR, 1)
                     }
                     val title = item.getString("title").trim()
-                    val content = item.getString("content").trim()
+                    val content = addFixedFooter(item.getString("content"))
                     if (title.isBlank() || content.isBlank()) throw Exception("فيه منشور فاضي، جرّب تاني")
                     generated.add(PostItem(((System.currentTimeMillis() + i) % Int.MAX_VALUE).toInt(),
                         title, content, groupUrl, slot.timeInMillis))
@@ -242,7 +255,7 @@ class MainActivity : Activity() {
 
     private fun addPost() {
         val title = titleInput.text.toString().trim().ifBlank { "منشور جديد" }
-        val content = contentInput.text.toString().trim()
+        val content = addFixedFooter(contentInput.text.toString())
         val url = groupInput.text.toString().trim()
         if (content.isBlank()) {
             toast("اكتب نص المنشور الأول")
