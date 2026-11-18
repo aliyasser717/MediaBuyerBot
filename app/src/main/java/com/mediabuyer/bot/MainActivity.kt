@@ -41,6 +41,10 @@ class MainActivity : Activity() {
         if (!reminderContent.isNullOrBlank()) {
             contentInput.setText(reminderContent)
             groupInput.setText(intent.getStringExtra("reminderGroupUrl") ?: "")
+            if (intent.getBooleanExtra("shareOnOpen", false) && savedInstanceState == null) {
+                contentInput.post { sharePost(reminderContent) }
+                toast("البوست جاهز للمشاركة — اختَر Facebook ثم الجروب وراجع قبل النشر")
+            }
         }
     }
 
