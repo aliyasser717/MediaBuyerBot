@@ -20,12 +20,16 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.net.HttpURLConnection
+import java.net.URL
+import org.json.JSONObject
 
 class MainActivity : Activity() {
     private lateinit var listBox: LinearLayout
     private lateinit var titleInput: EditText
     private lateinit var contentInput: EditText
     private lateinit var groupInput: EditText
+    private lateinit var backendUrlInput: EditText
     private lateinit var scheduleButton: Button
     private var selectedTime = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, 1) }
     private var selectedMillis: Long = selectedTime.timeInMillis
@@ -82,9 +86,17 @@ class MainActivity : Activity() {
         contentInput.minLines = 5
         contentInput.gravity = Gravity.TOP or Gravity.RIGHT
         groupInput = edit("رابط جروب فيسبوك")
+        backendUrlInput = edit("رابط خادم الذكاء الاصطناعي HTTPS")
         card.addView(titleInput, fieldParams())
         card.addView(contentInput, fieldParams())
         card.addView(groupInput, fieldParams())
+        card.addView(backendUrlInput, fieldParams())
+
+        val generate = Button(this).apply {
+            text = "توليد 6 بوستات بالذكاء الاصطناعي وجدولتها"
+            setOnClickListener { generateAndSchedulePosts() }
+        }
+        card.addView(generate, fieldParams())
 
         scheduleButton = Button(this).apply {
             text = "اختيار موعد النشر: ${dateFormat.format(Date(selectedMillis))}"
@@ -128,6 +140,70 @@ class MainActivity : Activity() {
             setTextColor(0xFF7A4B00.toInt())
             setPadding(dp(4), dp(18), dp(4), 0)
         }, wrap())
+    }
+
+    private fun generateAndSchedulePosts() {
+        val endpoint = backendUrlInput.text.toString().trim().trimEnd('/')
+        val groupUrl = groupInput.text.toString().trim()
+        if (!endpoint.startsWith("https://")) {
+            toast("أدخل رابط الخادم المنشور ويبدأ بـ https://")
+            return
+        }
+        if (!groupUrl.startsWith("https://") && !groupUrl.startsWith("http://")) {
+            toast("أدخل رابط جروب فيسبوك أولًا")
+            return
+        }
+        toast("جاري توليد المنشورات الستة...")
+        Thread {
+            try {
+                val connection = (URL("$endpoint/api/generate-six").openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 20000
+                    readTimeout = 90000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                }
+                val payload = JSONObject().apply {
+                    put("audience", "أصحاب البيزنس والمتاجر الإلكترونية والبراندات والشركات وصناع القرار")
+                    put("context", "خدمات Media Buying وإعلانات Meta وتحسين الحملات وجلب العملاء المحتملين")
+                }
+                connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+                val status = connection.responseCode
+                val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
+                    ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: "{}"
+                connection.disconnect()
+                if (status !in 200..299) throw Exception(JSONObject(body).optString("error", "تعذر الاتصال بالخادم"))
+                val postsArray = JSONObject(body).getJSONArray("posts")
+                if (postsArray.length() != 6) throw Exception("الخادم لم يُرجع 6 منشورات")
+                val now = Calendar.getInstance()
+                val hours = listOf(10, 12, 14, 16, 18, 20)
+                val generated = mutableListOf<PostItem>()
+                for (i in 0 until 6) {
+                    val item = postsArray.getJSONObject(i)
+                    val slot = Calendar.getInstance().apply {
+                        set(Calendar.HOUR_OF_DAY, hours[i])
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                        while (timeInMillis <= now.timeInMillis) add(Calendar.DAY_OF_YEAR, 1)
+                    }
+                    val title = item.getString("title").trim()
+                    val content = item.getString("content").trim()
+                    if (title.isBlank() || content.isBlank()) throw Exception("فيه منشور فاضي، جرّب تاني")
+                    val id = ((System.currentTimeMillis() + i) % Int.MAX_VALUE).toInt()
+                    generated.add(PostItem(id, title, content, groupUrl, slot.timeInMillis))
+                }
+                runOnUiThread {
+                    val all = ScheduleStore.load(this).apply { addAll(generated) }
+                    ScheduleStore.save(this, all)
+                    generated.forEach { ScheduleStore.schedule(this, it) }
+                    renderPosts()
+                    toast("اتولدوا واتجدولوا 6 منشورات بنجاح")
+                }
+            } catch (error: Exception) {
+                runOnUiThread { toast(error.message ?: "حصل خطأ أثناء التوليد") }
+            }
+        }.start()
     }
 
     private fun setSuggestedTime(hour: Int) {
