@@ -30,6 +30,7 @@ class MainActivity : Activity() {
     private lateinit var contentInput: EditText
     private lateinit var groupInput: EditText
     private lateinit var backendUrlInput: EditText
+    private lateinit var backendTokenInput: EditText
     private lateinit var scheduleButton: Button
     private var selectedTime = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, 1) }
     private var selectedMillis: Long = selectedTime.timeInMillis
@@ -86,11 +87,13 @@ class MainActivity : Activity() {
         contentInput.minLines = 5
         contentInput.gravity = Gravity.TOP or Gravity.RIGHT
         groupInput = edit("رابط جروب فيسبوك")
-        backendUrlInput = edit("رابط خادم الذكاء الاصطناعي HTTPS")\n        backendTokenInput = edit("رمز ربط التطبيق بالخادم")
+        backendUrlInput = edit("رابط خادم الذكاء الاصطناعي HTTPS")
+        backendTokenInput = edit("رمز ربط التطبيق بالخادم")
         card.addView(titleInput, fieldParams())
         card.addView(contentInput, fieldParams())
         card.addView(groupInput, fieldParams())
-        card.addView(backendUrlInput, fieldParams())\n        card.addView(backendTokenInput, fieldParams())
+        card.addView(backendUrlInput, fieldParams())
+        card.addView(backendTokenInput, fieldParams())
 
         val generate = Button(this).apply {
             text = "توليد 6 بوستات بالذكاء الاصطناعي وجدولتها"
@@ -149,7 +152,12 @@ class MainActivity : Activity() {
             toast("أدخل رابط الخادم المنشور ويبدأ بـ https://")
             return
         }
-        if (apiToken.isBlank()) {\n            toast("أدخل رمز ربط التطبيق بالخادم")\n            return\n        }\n        if (!groupUrl.startsWith("https://") && !groupUrl.startsWith("http://")) {
+        val apiToken = backendTokenInput.text.toString().trim()
+        if (apiToken.isBlank()) {
+            toast("أدخل رمز ربط التطبيق بالخادم")
+            return
+        }
+        if (!groupUrl.startsWith("https://") && !groupUrl.startsWith("http://")) {
             toast("أدخل رابط جروب فيسبوك أولًا")
             return
         }
@@ -161,7 +169,8 @@ class MainActivity : Activity() {
                     connectTimeout = 20000
                     readTimeout = 90000
                     doOutput = true
-                    setRequestProperty("Content-Type", "application/json; charset=utf-8")\n                    setRequestProperty("Authorization", "Bearer $apiToken")
+                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                    setRequestProperty("Authorization", "Bearer $apiToken")
                 }
                 val payload = JSONObject().apply {
                     put("audience", "أصحاب البيزنس والمتاجر الإلكترونية والبراندات والشركات وصناع القرار")
